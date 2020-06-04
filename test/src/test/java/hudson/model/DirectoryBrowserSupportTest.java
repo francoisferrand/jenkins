@@ -176,6 +176,48 @@ public class DirectoryBrowserSupportTest {
         zipfile.delete();
     }
 
+    //@Issue("JENKINS-xxxxx")
+    @Test
+    public void zip64Download() throws Exception {
+        File hugeFile;
+        try {
+            hugeFile = File.createTempFile("huge64bitFileTest-temp", "txt");
+            try {
+                RandomAccessFile largeFile = new RandomAccessFile(hugeFile, "rw");
+                largeFile.setLength(4 * 1024 * 1024 * 1024 + 2);
+            } catch (IOException e) {
+                /* We probably don't have enough free disk space
+                * That's ok, we'll skip this test...
+                */
+                System.out.println("Couldn't set up huge file for huge64bitFile test, skipping test", e);
+                return;
+            }
+
+            FreeStyleProject p = j.createFreeStyleProject();
+            p.setScm(new SingleFileSCM("artifact.out", hugeFile.toURI().toURL()));
+            //new URL("file", null, hugeFile.getAbsolutePath())));
+            p.getPublishersList().add(new ArtifactArchiver("*", "", true));
+            assertEquals(Result.SUCCESS, p.scheduleBuild2(0).get().getResult());
+
+            HtmlPage page = j.createWebClient().goTo("job/"+p.getName()+"/lastSuccessfulBuild/artifact/");
+            Page download = page.getAnchorByHref("./*zip*/archive.zip").click();
+            File zipfile = download((UnexpectedPage) download); // This generates an exception if zip64 is not used 
+
+            ZipFile readzip = new ZipFile(zipfile);
+
+            InputStream is = readzip.getInputStream(readzip.getEntry("archive/artifact.out"));
+            assertFalse("Downloaded zip file must not be empty", is.read() == -1);
+
+            is.close();
+            readzip.close();
+            zipfile.delete();
+        } finally {
+            if (hugeFile != null)
+                hugeFile.delete();
+        }
+    }
+
+
     @Issue("SECURITY-95")
     @Test
     public void contentSecurityPolicy() throws Exception {

@@ -60,6 +60,7 @@ import jenkins.util.SystemProperties;
 import jenkins.util.VirtualFile;
 import org.apache.commons.io.IOUtils;
 import org.apache.tools.zip.ZipEntry;
+import org.apache.tools.zip.Zip64Mode;
 import org.apache.tools.zip.ZipOutputStream;
 import org.kohsuke.accmod.Restricted;
 import org.kohsuke.accmod.restrictions.NoExternalUse;
@@ -459,6 +460,7 @@ public final class DirectoryBrowserSupport implements HttpResponse {
         OutputStream outputStream = rsp.getOutputStream();
         try (ZipOutputStream zos = new ZipOutputStream(outputStream)) {
             zos.setEncoding(System.getProperty("file.encoding")); // TODO JENKINS-20663 make this overridable via query parameter
+            zos.setUseZip64(Zip64Mode.AsNeeded);
             // TODO consider using run(Callable) here
 
             if (glob.isEmpty()) {
@@ -504,6 +506,7 @@ public final class DirectoryBrowserSupport implements HttpResponse {
         //      but not the file separator char of the (maybe remote) "dir".
         ZipEntry e = new ZipEntry(relativePath.replace('\\', '/'));
 
+        e.setSize(vf.length());
         e.setTime(vf.lastModified());
         zos.putNextEntry(e);
         try (InputStream in = vf.open()) {
